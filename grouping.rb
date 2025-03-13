@@ -1,6 +1,5 @@
 #!/usr/bin/env ruby
 require 'csv'
-require 'set'
 
 class PersonMatcher
   EMAIL_HEADER_PATTERN = /^Email\d*$/
@@ -173,6 +172,46 @@ class PersonMatcher
         phones.each { |phone| phone_map[phone] = matching_group }
       else
         record['person_id'] = @next_id
+        phones.each { |phone| phone_map[phone] = @next_id }
+        @next_id += 1
+      end
+    end
+  end
+
+  def group_by_email_or_phone(records)
+    email_map = {}
+    phone_map = {}
+
+    records.each do |record|
+      emails = get_all_emails(record)
+      phones = get_all_phones(record)
+      matching_group = nil
+
+      # Check emails first, then phones, take first match
+      emails.each do |email|
+        if email_map[email]
+          matching_group = email_map[email]
+          break
+        end
+      end
+
+      # Only check phones if no email match found
+      if !matching_group
+        phones.each do |phone|
+          if phone_map[phone]
+            matching_group = phone_map[phone]
+            break
+          end
+        end
+      end
+
+      if matching_group
+        record['person_id'] = matching_group
+        emails.each { |email| email_map[email] = matching_group }
+        phones.each { |phone| phone_map[phone] = matching_group }
+      else
+        record['person_id'] = @next_id
+        emails.each { |email| email_map[email] = @next_id }
         phones.each { |phone| phone_map[phone] = @next_id }
         @next_id += 1
       end
