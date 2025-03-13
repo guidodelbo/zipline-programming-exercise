@@ -176,6 +176,75 @@ class TestPersonMatcher < Minitest::Test
     refute_equal john_id, alice_id
   end
 
+  def test_multiple_matches_first_email_priority
+    csv_content = <<~CSV
+      FirstName,LastName,Email1,Email2,Phone, Zip
+      John,Doe,john@example.com,shared@example.com,123-456,94105
+      Jane,Smith,jane@example.com,other@example.com,999-888,94106
+      Bob,Brown,shared@example.com,other@example.com,999-888,94107
+    CSV
+
+    input_file = create_temp_csv(csv_content)
+    matcher = PersonMatcher.new('same_email')
+    matcher.process_file(input_file)
+
+    output_file = input_file.sub('.csv', '_output.csv')
+    output_rows = CSV.read(output_file)
+
+    john_id = output_rows[1][0]
+    jane_id = output_rows[2][0]
+    bob_id = output_rows[3][0]
+
+    assert_equal john_id, bob_id
+    refute_equal jane_id, bob_id
+  end
+
+  def test_multiple_matches_first_phone_priority
+    csv_content = <<~CSV
+      FirstName,LastName,Email,Phone1,Phone2,Zip
+      John,Doe,john@example.com,123-456,999-888,94105
+      Jane,Smith,jane@example.com,555-666,777-888,94106
+      Bob,Brown,bob@example.com,999-888,777-888,94107
+    CSV
+
+    input_file = create_temp_csv(csv_content)
+    matcher = PersonMatcher.new('same_phone')
+    matcher.process_file(input_file)
+
+    output_file = input_file.sub('.csv', '_output.csv')
+    output_rows = CSV.read(output_file)
+
+    john_id = output_rows[1][0]
+    jane_id = output_rows[2][0]
+    bob_id = output_rows[3][0]
+
+    assert_equal john_id, bob_id
+    refute_equal jane_id, bob_id
+  end
+
+  def test_email_or_phone_prioritizes_email_over_phone_matches
+    csv_content = <<~CSV
+      FirstName,LastName,Email,Phone,Zip
+      John,Doe,john@example.com,123-456,94105
+      Jane,Smith,jane@example.com,999-888,94106
+      Bob,Brown,john@example.com,999-888,94107
+    CSV
+
+    input_file = create_temp_csv(csv_content)
+    matcher = PersonMatcher.new('same_email_or_phone')
+    matcher.process_file(input_file)
+
+    output_file = input_file.sub('.csv', '_output.csv')
+    output_rows = CSV.read(output_file)
+
+    john_id = output_rows[1][0]
+    jane_id = output_rows[2][0]
+    bob_id = output_rows[3][0]
+
+    assert_equal john_id, bob_id
+    refute_equal jane_id, bob_id
+  end
+
   def test_case_insensitive_email_matching
     csv_content = <<~CSV
       FirstName,LastName,Phone,Email,Zip
@@ -205,6 +274,8 @@ class TestPersonMatcher < Minitest::Test
       John,Doe," (555) 123-4567 "," john@example.com ",94105
       Jane,Smith,(555) 123-4567,john@example.com,94106
       Alice,Johnson," (555) 444-5555 "," alice@example.com  ",94107
+      Bob,Brown,,,94107
+      Matt,Rogers,,,94107
     CSV
 
     input_file = create_temp_csv(csv_content)
@@ -217,9 +288,14 @@ class TestPersonMatcher < Minitest::Test
     john_id = output_rows[1][0]
     jane_id = output_rows[2][0]
     alice_id = output_rows[3][0]
+    bob_id = output_rows[4][0]
+    matt_id = output_rows[5][0]
 
     assert_equal john_id, jane_id
     refute_equal john_id, alice_id
+
+    # Empty phone and email fields should not be matched
+    refute_equal bob_id, matt_id
   end
 
   def test_empty_rows
@@ -299,7 +375,7 @@ class TestPersonMatcher < Minitest::Test
       matcher.process_file(input_file)
     end
 
-    assert_match(/Required name fields missing: LastName/, error.message)
+    assert_match(/Required fields missing: LastName/, error.message)
   end
 
   def test_required_first_name_field
@@ -312,7 +388,7 @@ class TestPersonMatcher < Minitest::Test
       matcher.process_file(input_file)
     end
 
-    assert_match(/Required name fields missing: FirstName/, error.message)
+    assert_match(/Required fields missing: FirstName/, error.message)
   end
 
   def test_row_length_mismatch
@@ -342,6 +418,6 @@ class TestPersonMatcher < Minitest::Test
       matcher.process_file(input_file)
     end
 
-    assert_match(/Required name fields missing: FirstName, LastName/, error.message)
+    assert_match(/Required fields missing: FirstName, LastName/, error.message)
   end
 end
