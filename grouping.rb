@@ -24,6 +24,10 @@ class PersonMatcher
   end
 
   def process_file(input_file)
+    unless File.exist?(input_file)
+      raise ArgumentError, "Input file '#{input_file}' does not exist"
+    end
+
     puts "INFO: Processing #{input_file} using #{@matching_type} matching..."
     rows = []
 
@@ -235,9 +239,63 @@ end
 
 # Only run the main execution if this file is being run directly (not required/imported)
 if __FILE__ == $PROGRAM_NAME
-  if ARGV.length != 2
-    puts "USAGE: #{$0} <input_file> <matching_type>"
-    puts "MATCHING TYPES: #{PersonMatcher::MATCHING_TYPES.values.join(', ')}"
+  def print_help
+    puts <<~HELP
+      Description:
+        This script processes a CSV file containing person records and groups them based on
+        matching email addresses or phone numbers. It helps identify records that likely
+        represent the same person by analyzing their contact information.
+
+      Usage: #{$0} [options] <input_file> <matching_type>
+
+      Required Arguments:
+        input_file           Path to the input CSV file
+        matching_type        Type of matching to perform (see below)
+
+      Options:
+        -h, --help           Show this help message
+
+      Matching Types:
+        same_email           Match records with identical email addresses
+        same_phone           Match records with identical phone numbers
+        same_email_or_phone  Match records with identical email OR phone numbers
+
+      Example:
+        #{$0} input.csv same_email
+        #{$0} input.csv same_phone
+        #{$0} input.csv same_email_or_phone
+
+      Input CSV Requirements:
+        - Must contain FirstName and LastName columns
+        - For email matching: must contain at least one Email column
+        - For phone matching: must contain at least one Phone column
+        - For email or phone matching: must contain at least one Email or Phone column
+
+      Output:
+        The script generates a new CSV file with the same name as the input file but with
+        '_output' appended before the extension. For example:
+          input.csv -> input_output.csv
+
+        The output file contains all original columns plus a 'person_id' column at the start.
+        Records with the same person_id are considered to represent the same person based on
+        the matching criteria used.
+    HELP
+    exit 0
+  end
+
+  if ARGV.include?('-h') || ARGV.include?('--help')
+    print_help
+  end
+
+  if ARGV.length < 2
+    puts "ERROR: Missing required arguments"
+    puts "Usage: #{$0} <input_file> <matching_type>"
+    puts "Run with -h or --help for more information"
+    exit 1
+  elsif ARGV.length > 2
+    puts "ERROR: Too many arguments"
+    puts "Usage: #{$0} <input_file> <matching_type>"
+    puts "Run with -h or --help for more information"
     exit 1
   end
 
@@ -248,10 +306,12 @@ if __FILE__ == $PROGRAM_NAME
     matcher = PersonMatcher.new(matching_type)
     matcher.process_file(input_file)
   rescue ArgumentError => e
-    puts "ERROR: Invalid data format - #{e.message}"
+    puts "ERROR: Invalid input - #{e.message}"
+    puts "Run with -h or --help for more information"
     exit 1
   rescue => e
     puts "ERROR: #{e.message}"
+    puts "Run with -h or --help for more information"
     exit 1
   end
 end

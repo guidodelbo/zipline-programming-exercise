@@ -298,6 +298,14 @@ class TestPersonMatcher < Minitest::Test
     refute_equal bob_id, matt_id
   end
 
+  def test_inexistent_file
+    error = assert_raises(ArgumentError) do
+      PersonMatcher.new('same_email').process_file('inexistent_file.csv')
+    end
+
+    assert_match(/Input file 'inexistent_file.csv' does not exist/, error.message)
+  end
+
   def test_empty_rows
     csv_content = "FirstName,LastName,Phone,Email,Zip\n"
 
