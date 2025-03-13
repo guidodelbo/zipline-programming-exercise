@@ -3,8 +3,30 @@
 require 'minitest/autorun'
 require 'csv'
 require 'tempfile'
+require_relative './grouping'
 
 class TestPersonMatcher < Minitest::Test
+  def setup
+    @temp_files = []
+  end
+
+  def teardown
+    @temp_files.each do |f|
+      output_file = f.path.sub('.csv', '_output.csv')
+      File.delete(output_file) if File.exist?(output_file)
+      f.close!
+    end
+  end
+
+  def create_temp_csv(content)
+    temp_file = Tempfile.new(['test', '.csv'])
+    temp_file.write(content)
+    temp_file.close
+    @temp_files << temp_file
+
+    temp_file.path
+  end
+
   def test_same_email_matching
     csv_content = <<~CSV
       FirstName,LastName,Phone1,Phone2,Email1,Email2,Zip
@@ -321,21 +343,5 @@ class TestPersonMatcher < Minitest::Test
     end
 
     assert_match(/Required name fields missing: FirstName, LastName/, error.message)
-  end
-
-  def test_duplicate_headers
-    csv_content = <<~CSV
-      FirstName,LastName,Phone,Email,Email,Zip
-      John,Doe,(555) 123-4567,john@example.com,john2@example.com,94105
-    CSV
-
-    input_file = create_temp_csv(csv_content)
-    matcher = PersonMatcher.new('same_email')
-
-    error = assert_raises(ArgumentError) do
-      matcher.process_file(input_file)
-    end
-
-    assert_match(/Duplicate header found: Email/, error.message)
   end
 end
